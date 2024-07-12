@@ -1,0 +1,31 @@
+{
+  "name": "btc-relay-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node ./dist/index.js",
+    "dev": "nodemon --exec \"node --experimental-specifier-resolution=node --max-old-space-size=3072 --no-node-snapshot --loader ts-node/esm\" src/index.mts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^3.1.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.3"
+  },
+  "dependencies": {
+    "@types/node": "^20.14.10",
+    "@vsc.eco/client": "^0.0.7",
+    "axios": "^1.7.2",
+    "dids": "^5.0.2",
+    "kubo-rpc-client": "^4.1.1",
+    "ts-essentials": "^10.0.1",
+    "undici": "^6.19.2",
+    "winston": "^3.13.1",
+    "winston-daily-rotate-file": "^5.0.0"
+  },
+  "type": "module"
+}
