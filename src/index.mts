@@ -319,24 +319,24 @@ async function checkHealth(currentHeight): Promise<boolean> {
     await sleep(DELAY_BETWEEN_INJECTIONS);
     const blockProgress = await getContractBlockProgress()
 
-    if (contractHeightCache === undefined || contractHeightCache !== blockProgress) {
+    if ((contractHeightCache === undefined || contractHeightCache === null)  
+        || contractHeightCache !== blockProgress) {
         contractHeightCache = blockProgress;
         noProgressCounter = 0;
+        logger.info(`Health check passed at block height ${currentHeight}`)
     } else {
         logger.error("No new blocks were ingested since last check!")
         noProgressCounter++;
+        
+        if (noProgressCounter >= NO_PROGRESS_SHUTDOWN_THRESHOLD) {
+            logger.error(`No progress was made for the last ${NO_PROGRESS_SHUTDOWN_THRESHOLD} checks. Exiting program.`)
+            process.exit(1)
+        } else if (noProgressCounter % NO_PROGRESS_RESET_THRESHOLD === 0) {
+            logger.error(`No progress was made for the last ${noProgressCounter} checks.`)
+            return false;
+        }
     }
-
-    if (noProgressCounter >= NO_PROGRESS_SHUTDOWN_THRESHOLD) {
-        logger.error(`No progress was made for the last ${NO_PROGRESS_SHUTDOWN_THRESHOLD} checks. Exiting program.`)
-        process.exit(1)
-    } else if (noProgressCounter % NO_PROGRESS_RESET_THRESHOLD === 0) {
-        logger.error(`No progress was made for the last ${noProgressCounter} checks.`)
-        return false;
-    } else {
-        logger.info(`Health check passed at block height ${currentHeight}`)
-    }
-
+    
     return true;
 }
 
