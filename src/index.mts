@@ -147,30 +147,6 @@ async function getContractState(lastOutputTx) {
     return data.data.contractState.state
 }
 
-interface Header {
-    height: number;
-    [key: string]: any;
-}
-
-function sortByHeight(obj: { [key: string]: Header }): Header[] {
-    // Extract all object values from the main object
-    const items: Header[] = Object.values(obj);
-
-    // Sort these objects based on the 'height' property
-    items.sort((a, b) => a.height - b.height);
-
-    // Return the sorted array of objects
-    return items;
-}
-
-function createRange(start: number, end: number): number[] {
-    return Array.from({ length: end - start + 1 }, (_, i) => i + start);
-}
-
-interface BlocksToFetch {
-    lastHeight: number;
-}
-
 interface Block {
     [key: string]: string;
 }
@@ -315,8 +291,6 @@ async function getTopBlockHeight(): Promise<number> {
 }
 
 async function checkHealth(currentHeight): Promise<boolean> {
-    // wait for a little bit, so the last injections are confirmed
-    await sleep(DELAY_BETWEEN_INJECTIONS);
     const blockProgress = await getContractBlockProgress()
 
     if ((contractHeightCache === undefined || contractHeightCache === null)  
