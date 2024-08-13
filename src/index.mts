@@ -46,7 +46,7 @@ const NO_PROGRESS_SHUTDOWN_THRESHOLD = 10; // how many times we can't make progr
 const NO_PROGRESS_RESET_THRESHOLD = 3; // how many times we can't make progress (contract state doesnt update) until we reset the state (every x tries)
 const HEALTH_CHECK_INTERVAL = 300; // how many blocks can pass until we check if the state is actually updated
 
-const SUBMIT_AMOUNT = 100; // max blocks per tx
+const SUBMIT_AMOUNT = 250; // max blocks per tx
 const PARALLEL_TX_INJECT_AMOUNT = 1; // tx simultaneous injected
 
 const BLOCK_ZERO_HEADER_HASH = "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c";
@@ -172,15 +172,15 @@ function getHighestKey(obj: { [key: string]: any }): number {
 async function getContractBlockProgress(): Promise<number> {
     try {
         const ipfs = await create(IPFS_OPTIONS);
-    
+
         const txId = await getLastOutputTransaction()
         if (!txId) {
             return undefined
         }
-    
+
         const state = await getContractState(txId)
         const headers = state.headers.Links
-    
+
         // pla: getting the last height of the last confirmed header, NOT preheaders!
         const sortedHeaders = sortByRangeProperty(Object.values(headers))
         const lastHeaderHash = sortedHeaders[sortedHeaders.length - 1].Hash["/"]
@@ -221,36 +221,37 @@ async function startContractInjector() {
     setInterval(async () => {
         let health = true;
         for (let x = 0; x < PARALLEL_TX_INJECT_AMOUNT; x++) {
+            if (headersIngestQueue.length >= SUBMIT_AMOUNT) {
+                await sleep(DELAY_BETWEEN_VSC_API_CALLS)
+                let currentHeaderIngestion = {}
 
-            await sleep(DELAY_BETWEEN_VSC_API_CALLS)
-            let currentHeaderIngestion = {}
-            
-            for (let x = 0; x < SUBMIT_AMOUNT; x++) {
-                const block = headersIngestQueue.shift()
-                const blockHeight: number = +Object.keys(block)[0]
+                for (let x = 0; x < SUBMIT_AMOUNT; x++) {
+                    const block = headersIngestQueue.shift()
+                    const blockHeight: number = +Object.keys(block)[0]
 
-                // every x blocks do a health check to validate if we make progress and reset the state if necessary
-                if (blockHeight % HEALTH_CHECK_INTERVAL === 0) {
-                    health = await checkHealth(blockHeight)
-                }
-                
-                currentHeaderIngestion = { ...currentHeaderIngestion, ...block }
-            }
+                    // every x blocks do a health check to validate if we make progress and reset the state if necessary
+                    if (blockHeight % HEALTH_CHECK_INTERVAL === 0) {
+                        health = await checkHealth(blockHeight)
+                    }
 
-            if (!health) {
-                nextBlockOverride = await getContractBlockProgress()
-                headersIngestQueue.length = 0;
-                logger.error(`Resetting the insertion queue and starting at block height ${nextBlockOverride} again`);
-                break;
-            }
-
-            if (Object.keys(currentHeaderIngestion).length !== 0) {
-                const payload = {
-                    headers: Object.values(currentHeaderIngestion)
+                    currentHeaderIngestion = { ...currentHeaderIngestion, ...block }
                 }
 
-                logger.info(`Injecting the following headers to the contract: ${Object.keys(currentHeaderIngestion)}`)
-                await silenceConsoleLogAsync(sendVSCTx, "processHeaders", payload)
+                if (!health) {
+                    nextBlockOverride = await getContractBlockProgress()
+                    headersIngestQueue.length = 0;
+                    logger.error(`Resetting the insertion queue and starting at block height ${nextBlockOverride} again`);
+                    break;
+                }
+
+                if (Object.keys(currentHeaderIngestion).length !== 0) {
+                    const payload = {
+                        headers: Object.values(currentHeaderIngestion)
+                    }
+
+                    logger.info(`Injecting the following headers to the contract: ${Object.keys(currentHeaderIngestion)}`)
+                    await silenceConsoleLogAsync(sendVSCTx, "processHeaders", payload)
+                }
             }
         }
     }, DELAY_BETWEEN_INJECTIONS)
@@ -288,7 +289,7 @@ async function getTopBlockHeight(): Promise<number> {
 async function checkHealth(currentHeight): Promise<boolean> {
     const blockProgress = await getContractBlockProgress()
 
-    if ((contractHeightCache === undefined || contractHeightCache === null)  
+    if ((contractHeightCache === undefined || contractHeightCache === null)
         || contractHeightCache !== blockProgress) {
         contractHeightCache = blockProgress;
         noProgressCounter = 0;
@@ -296,7 +297,7 @@ async function checkHealth(currentHeight): Promise<boolean> {
     } else {
         logger.error("No new blocks were ingested since last check!")
         noProgressCounter++;
-        
+
         if (noProgressCounter >= NO_PROGRESS_SHUTDOWN_THRESHOLD) {
             logger.error(`No progress was made for the last ${NO_PROGRESS_SHUTDOWN_THRESHOLD} checks. Exiting program.`)
             process.exit(1)
@@ -305,7 +306,7 @@ async function checkHealth(currentHeight): Promise<boolean> {
             return false;
         }
     }
-    
+
     return true;
 }
 
