@@ -193,25 +193,20 @@ async function getContractBlockProgress(): Promise<number> {
     }
 }
 
-async function getClient() {
-    const client = new vClient({
+async function createClient() {
+    client = new vClient({
         api: `http://${VSC_API}`,
         loginType: 'offchain'
-    })
+    });
     const secret = hexToUint8Array(DID_SECRET)
     const keyPrivate = new Ed25519Provider(secret)
     const did = new DID({ provider: keyPrivate, resolver: KeyResolver.getResolver() })
     await did.authenticate()
-    
-    await client.login(did)
 
-    return client;
+    await client.login(did)
 }
 
 async function sendVSCTx(action, payload) {
-    if (!client) {
-        client = await getClient()
-    }
     const tx = new vTransaction()
     tx.setTx({
         op: 'call_contract',
@@ -315,6 +310,7 @@ async function checkHealth(currentHeight): Promise<boolean> {
 }
 
 (async () => {
+    await createClient()
     let blockProgress = await getContractBlockProgress()
 
     // need to initialize the contract first
