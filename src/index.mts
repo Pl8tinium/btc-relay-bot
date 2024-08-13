@@ -250,7 +250,7 @@ async function startContractInjector() {
                         headers: Object.values(currentHeaderIngestion)
                     }
 
-                    logger.info(`Injecting the following headers to the contract: ${Object.keys(currentHeaderIngestion)}`)
+                    logger.info(`Injecting the following headers to the contract: (${Object.keys(currentHeaderIngestion).length}) ${Object.keys(currentHeaderIngestion)}`)
                     await silenceConsoleLogAsync(sendVSCTx, "processHeaders", payload)
                 }
             }
