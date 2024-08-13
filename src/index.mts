@@ -221,11 +221,12 @@ async function startContractInjector() {
     setInterval(async () => {
         let health = true;
         for (let x = 0; x < PARALLEL_TX_INJECT_AMOUNT; x++) {
-            if (headersIngestQueue.length >= SUBMIT_AMOUNT) {
+            if (headersIngestQueue.length > 0) {
                 await sleep(DELAY_BETWEEN_VSC_API_CALLS)
                 let currentHeaderIngestion = {}
 
-                for (let x = 0; x < SUBMIT_AMOUNT; x++) {
+                const injectedHeadersLength = headersIngestQueue.length > SUBMIT_AMOUNT ? SUBMIT_AMOUNT : headersIngestQueue.length;
+                for (let x = 0; x < injectedHeadersLength; x++) {
                     const block = headersIngestQueue.shift()
                     const blockHeight: number = +Object.keys(block)[0]
 
