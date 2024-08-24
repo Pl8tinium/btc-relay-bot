@@ -38,16 +38,16 @@ const QUEUE_MAX_SIZE = 5000; // how many btc block headers we can store in the q
 const DELAY_BETWEEN_INJECTIONS = 1000 * 60 * 3; // supposed to represent the time we can be sure a transaction is finalized
 const LIVE_BLOCK_CHECK_INTERVAL = 1000 * 60 * 5; // when we are live we check every x minutes for new blocks
 const FAILED_REQUESTS_NOTIFICATION_INTERVAL = 1000 * 60 * 5; // how often to notify about failed requests
-const DELAY_BETWEEN_BTC_RPC_CALLS = 1000; // how much time at minimum we wait between btc rpc calls
-const DELAY_BETWEEN_VSC_API_CALLS = 1500; // how much time at minimum we wait between vsc api calls
+const DELAY_BETWEEN_BTC_RPC_CALLS = 600; // how much time at minimum we wait between btc rpc calls
+const DELAY_BETWEEN_VSC_API_CALLS = 2000; // how much time at minimum we wait between vsc api calls
 const MAX_REQUEST_RETRIES = 5; // how many times we retry a btc rpc request
 const MAX_REQUEST_FAIL_COUNTER = 10; // how often we can fail a btc rpc request before we stop the program
 const NO_PROGRESS_SHUTDOWN_THRESHOLD = 10; // how many times we can't make progress (contract state doesnt update) until we stop the program
 const NO_PROGRESS_RESET_THRESHOLD = 3; // how many times we can't make progress (contract state doesnt update) until we reset the state (every x tries)
 const HEALTH_CHECK_INTERVAL = 300; // how many blocks can pass until we check if the state is actually updated
 
-const SUBMIT_AMOUNT = 250; // max blocks per tx
-const PARALLEL_TX_INJECT_AMOUNT = 1; // tx simultaneous injected
+const SUBMIT_AMOUNT = 100; // max blocks per tx
+const PARALLEL_TX_INJECT_AMOUNT = 2; // tx simultaneous injected
 
 const BLOCK_ZERO_HEADER_HASH = "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c";
 const CONTRACT_INIT_PARAMS = {
@@ -214,7 +214,7 @@ async function sendVSCTx(action, payload) {
         contract_id: CONTRACT_ID,
         payload: payload
     })
-    await tx.broadcast(client);
+    return await tx.broadcast(client);
 }
 
 async function startContractInjector() {
@@ -250,8 +250,12 @@ async function startContractInjector() {
                         headers: Object.values(currentHeaderIngestion)
                     }
 
-                    logger.info(`Injecting the following headers to the contract: (${Object.keys(currentHeaderIngestion).length}) ${Object.keys(currentHeaderIngestion)}`)
-                    await silenceConsoleLogAsync(sendVSCTx, "processHeaders", payload)
+                    const result = await silenceConsoleLogAsync(sendVSCTx, "processHeaders", payload)
+                    if (result !== null && result.id !== undefined) {
+                        logger.info(`Injecting the following headers to the contract: (amount:${Object.keys(currentHeaderIngestion).length}) (tx:${result.id.substring(result.id.length - 5)}) ${Object.keys(currentHeaderIngestion)}`)
+                    } else {
+                        logger.error("Failed to inject headers to the contract.", result)
+                    }
                 }
             }
         }
@@ -262,12 +266,14 @@ async function silenceConsoleLogAsync(func: Function, ...args) {
     const originalConsoleLog = console.log;
     console.log = function () { };
     try {
-        await func(...args);
+        const result = await func(...args);
         console.log = originalConsoleLog;
+        return result
     }
     catch (e) {
         console.log = originalConsoleLog;
         logger.error(e)
+        return null
     }
 }
 
