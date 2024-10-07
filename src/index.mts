@@ -32,7 +32,7 @@ const logger = winston.createLogger({
 const VSC_API = 'localhost:1337'
 const IPFS_OPTIONS = { url: 'http://localhost:5101' }
 const BTC_RPC = 'https://bitcoin-mainnet.public.blastapi.io'
-const CONTRACT_ID = 'vs41q9c3yg9af6z8ptpc29pujuc9lj99qkwha2vdmwx7ketnyxtlpgv0d97pguchqe9s'
+const CONTRACT_ID = 'vs41q9c3ygzw69uda985xazxmt06ul9damsj83k4vlc8ze8z3r3aj2l8ht9h6gpsjgx4'
 const DID_SECRET = "8b9226616064fbcd75711e67ba854e565a0278e94842ebfe52ee615f91a445f9"
 const QUEUE_MAX_SIZE = 5000; // how many btc block headers we can store in the queue
 const DELAY_BETWEEN_INJECTIONS = 1000 * 60 * 3; // supposed to represent the time we can be sure a transaction is finalized
@@ -44,10 +44,10 @@ const MAX_REQUEST_RETRIES = 5; // how many times we retry a btc rpc request
 const MAX_REQUEST_FAIL_COUNTER = 10; // how often we can fail a btc rpc request before we stop the program
 const NO_PROGRESS_SHUTDOWN_THRESHOLD = 10; // how many times we can't make progress (contract state doesnt update) until we stop the program
 const NO_PROGRESS_RESET_THRESHOLD = 3; // how many times we can't make progress (contract state doesnt update) until we reset the state (every x tries)
-const HEALTH_CHECK_INTERVAL = 300; // how many blocks can pass until we check if the state is actually updated
+const HEALTH_CHECK_INTERVAL = 1000; // how many blocks can pass until we check if the state is actually updated
 
 const SUBMIT_AMOUNT = 100; // max blocks per tx
-const PARALLEL_TX_INJECT_AMOUNT = 2; // tx simultaneous injected
+const PARALLEL_TX_INJECT_AMOUNT = 1; // tx simultaneous injected
 
 const BLOCK_ZERO_HEADER_HASH = "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c";
 const CONTRACT_INIT_PARAMS = {
@@ -137,7 +137,8 @@ async function getContractState(lastOutputTx) {
         }
     `
 
-    const { data } = await axios.post(`http://${VSC_API}/api/v1/graphql`, {
+    const { data } = 
+    await axios.post(`http://${VSC_API}/api/v1/graphql`, {
         query: STATE_GQL,
         variables: {
             outputId: lastOutputTx,
@@ -179,14 +180,12 @@ async function getContractBlockProgress(): Promise<number> {
         }
 
         const state = await getContractState(txId)
-        const headers = state.headers.Links
 
-        // pla: getting the last height of the last confirmed header, NOT preheaders!
-        const sortedHeaders = sortByRangeProperty(Object.values(headers))
-        const lastHeaderHash = sortedHeaders[sortedHeaders.length - 1].Hash["/"]
-        const lastHeaderStore = (await ipfs.dag.get(CID.parse(lastHeaderHash)) as any).value
-        const lastConfirmedHeight = getHighestKey(lastHeaderStore)
-        return lastConfirmedHeight
+        if (state.highest_validated_header) {
+            return state.highest_validated_header.height
+        } else {   
+            return 0;
+        }
     } catch (e) {
         logger.error("Failed to get contract block progress", e)
         return undefined
@@ -240,8 +239,9 @@ async function startContractInjector() {
 
                 if (!health) {
                     nextBlockOverride = await getContractBlockProgress()
+                    await sendVSCTx("clearPreHeaders", {});
                     headersIngestQueue.length = 0;
-                    logger.error(`Resetting the insertion queue and starting at block height ${nextBlockOverride} again`);
+                    logger.error(`Resetting the insertion queue and the contracts preheaders state. Starting at block height ${nextBlockOverride} again`);
                     break;
                 }
 
